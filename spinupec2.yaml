@@ -1,0 +1,52 @@
+---
+- hosts: localhost
+
+  tasks:
+
+    - name: Creating and configuring Security Group
+      ec2_group:
+         name: Ansible_Security_Grp
+         description: Rules Allowing Traffic on port 22 and 80 and 443
+         region: us-east-1
+         rules:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            from_port: 443
+            to_port: 443
+            cidr_ip: 98.109.149.228/32
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: 0.0.0.0/0
+         rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+
+    - name: Spin up a new EC2 Instance
+      ec2:
+         key_name: nirav
+         region: us-east-1
+         instance_type: t2.micro
+         image: ami-14c5486b
+         wait: yes
+         wait_timeout: 500
+         count: 1
+         instance_tags:
+           Name: ansibleserver
+           Owner: nirav
+         volumes:
+          - device_name: /dev/xvda
+            volume_type: gp2
+            volume_size: 8
+         monitoring: no
+         vpc_subnet_id: subnet-881e44c0
+         assign_public_ip: yes
+         group: Ansible_Security_Grp
+      register: ec2_out
+
+    - name: Wait for SSH to get ready
+      wait_for: host={{ item.public_dns_name }} port=22 delay=60 timeout=320 state=started
+      with_items: '{{ec2_out.instances}}'
